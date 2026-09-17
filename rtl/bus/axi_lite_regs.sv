@@ -73,6 +73,19 @@ module axi_lite_regs
     output logic [31:0]               exec_mode_o,
 
     // -----------------------------------------------------------------------
+    //  64-Bit Upper Memory and NVMe Storage Interface
+    // -----------------------------------------------------------------------
+    output logic [31:0]               ddr_base_act_hi_o,
+    output logic [31:0]               ddr_base_wgt_hi_o,
+    output logic [31:0]               ddr_base_kv_hi_o,
+    output logic [31:0]               ddr_base_out_hi_o,
+    output logic [31:0]               storage_lba_lo_o,
+    output logic [31:0]               storage_lba_hi_o,
+    output logic [31:0]               storage_blocks_o,
+    output logic [31:0]               storage_ctrl_o,
+    input  logic [31:0]               storage_status_i,
+
+    // -----------------------------------------------------------------------
     //  Graph Mode status inputs (read-only)
     // -----------------------------------------------------------------------
     input  logic [31:0]               graph_status_i,
@@ -103,6 +116,14 @@ module axi_lite_regs
     logic [31:0] reg_token_idx;
     logic [31:0] reg_debug_ctrl;
     logic [31:0] reg_exec_mode;
+    logic [31:0] reg_ddr_base_act_hi;
+    logic [31:0] reg_ddr_base_wgt_hi;
+    logic [31:0] reg_ddr_base_kv_hi;
+    logic [31:0] reg_ddr_base_out_hi;
+    logic [31:0] reg_storage_lba_lo;
+    logic [31:0] reg_storage_lba_hi;
+    logic [31:0] reg_storage_blocks;
+    logic [31:0] reg_storage_ctrl;
 
     // Soft-reset hold counter (holds reset for 4 cycles)
     logic [2:0]  soft_reset_cnt;
@@ -217,10 +238,18 @@ module axi_lite_regs
             reg_model_heads    <= 32'd0;
             reg_model_head_dim <= 32'd0;
             reg_seq_len        <= 32'd0;
-            reg_token_idx      <= 32'd0;
-            reg_debug_ctrl     <= 32'd0;
-            reg_exec_mode      <= 32'd0;
-            soft_reset_cnt     <= 3'd0;
+            reg_token_idx        <= 32'd0;
+            reg_debug_ctrl       <= 32'd0;
+            reg_exec_mode        <= 32'd0;
+            reg_ddr_base_act_hi  <= 32'd0;
+            reg_ddr_base_wgt_hi  <= 32'd0;
+            reg_ddr_base_kv_hi   <= 32'd0;
+            reg_ddr_base_out_hi  <= 32'd0;
+            reg_storage_lba_lo   <= 32'd0;
+            reg_storage_lba_hi   <= 32'd0;
+            reg_storage_blocks   <= 32'd0;
+            reg_storage_ctrl     <= 32'd0;
+            soft_reset_cnt       <= 3'd0;
         end else begin
             // ----------------------------------------------------------
             //  START bit auto-clear: pulse for exactly 1 cycle
@@ -265,7 +294,15 @@ module axi_lite_regs
                     REG_TOKEN_IDX[7:0]:      reg_token_idx      <= strb_write(reg_token_idx,      wr_data, wr_strb);
                     REG_DEBUG_CTRL[7:0]:     reg_debug_ctrl     <= strb_write(reg_debug_ctrl,     wr_data, wr_strb);
                     REG_EXEC_MODE[7:0]:      reg_exec_mode      <= strb_write(reg_exec_mode,      wr_data, wr_strb);
-                    // REG_GRAPH_STATUS, REG_GRAPH_PC, REG_GRAPH_LAST_OP are read-only
+                    REG_DDR_BASE_ACT_HI[7:0]: reg_ddr_base_act_hi <= strb_write(reg_ddr_base_act_hi, wr_data, wr_strb);
+                    REG_DDR_BASE_WGT_HI[7:0]: reg_ddr_base_wgt_hi <= strb_write(reg_ddr_base_wgt_hi, wr_data, wr_strb);
+                    REG_DDR_BASE_KV_HI[7:0]:  reg_ddr_base_kv_hi  <= strb_write(reg_ddr_base_kv_hi,  wr_data, wr_strb);
+                    REG_DDR_BASE_OUT_HI[7:0]: reg_ddr_base_out_hi <= strb_write(reg_ddr_base_out_hi, wr_data, wr_strb);
+                    REG_STORAGE_LBA_LO[7:0]:  reg_storage_lba_lo  <= strb_write(reg_storage_lba_lo,  wr_data, wr_strb);
+                    REG_STORAGE_LBA_HI[7:0]:  reg_storage_lba_hi  <= strb_write(reg_storage_lba_hi,  wr_data, wr_strb);
+                    REG_STORAGE_BLOCKS[7:0]:  reg_storage_blocks  <= strb_write(reg_storage_blocks,  wr_data, wr_strb);
+                    REG_STORAGE_CTRL[7:0]:    reg_storage_ctrl    <= strb_write(reg_storage_ctrl,    wr_data, wr_strb);
+                    // REG_GRAPH_STATUS, REG_GRAPH_PC, REG_GRAPH_LAST_OP, REG_STORAGE_STATUS are read-only
                     default: ;  // unmapped -- silently ignore
                 endcase
             end
@@ -324,6 +361,15 @@ module axi_lite_regs
                     REG_GRAPH_STATUS[7:0]:   s_axil_rdata <= graph_status_i;
                     REG_GRAPH_PC[7:0]:       s_axil_rdata <= graph_pc_i;
                     REG_GRAPH_LAST_OP[7:0]:  s_axil_rdata <= graph_last_op_i;
+                    REG_DDR_BASE_ACT_HI[7:0]: s_axil_rdata <= reg_ddr_base_act_hi;
+                    REG_DDR_BASE_WGT_HI[7:0]: s_axil_rdata <= reg_ddr_base_wgt_hi;
+                    REG_DDR_BASE_KV_HI[7:0]:  s_axil_rdata <= reg_ddr_base_kv_hi;
+                    REG_DDR_BASE_OUT_HI[7:0]: s_axil_rdata <= reg_ddr_base_out_hi;
+                    REG_STORAGE_LBA_LO[7:0]:  s_axil_rdata <= reg_storage_lba_lo;
+                    REG_STORAGE_LBA_HI[7:0]:  s_axil_rdata <= reg_storage_lba_hi;
+                    REG_STORAGE_BLOCKS[7:0]:  s_axil_rdata <= reg_storage_blocks;
+                    REG_STORAGE_CTRL[7:0]:    s_axil_rdata <= reg_storage_ctrl;
+                    REG_STORAGE_STATUS[7:0]:  s_axil_rdata <= storage_status_i;
                     default:                 s_axil_rdata <= 32'hDEAD_BEEF;
                 endcase
             end
@@ -352,6 +398,14 @@ module axi_lite_regs
     assign token_idx_o      = reg_token_idx;
     assign debug_ctrl_o     = reg_debug_ctrl;
     assign exec_mode_o      = reg_exec_mode;
+    assign ddr_base_act_hi_o = reg_ddr_base_act_hi;
+    assign ddr_base_wgt_hi_o = reg_ddr_base_wgt_hi;
+    assign ddr_base_kv_hi_o  = reg_ddr_base_kv_hi;
+    assign ddr_base_out_hi_o = reg_ddr_base_out_hi;
+    assign storage_lba_lo_o  = reg_storage_lba_lo;
+    assign storage_lba_hi_o  = reg_storage_lba_hi;
+    assign storage_blocks_o  = reg_storage_blocks;
+    assign storage_ctrl_o    = reg_storage_ctrl;
 
     // START is a single-cycle pulse derived from the register bit
     assign start_pulse_o = reg_ctrl[CTRL_START];

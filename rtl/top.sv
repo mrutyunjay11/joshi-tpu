@@ -15,7 +15,7 @@ module top
     parameter int P_DATA_W      = 8,
     parameter int P_ACC_W       = 32,
     parameter int P_AXI_DATA_W  = 512,
-    parameter int P_AXI_ADDR_W  = 32,
+    parameter int P_AXI_ADDR_W  = 64,
     parameter int P_AXI_STRB_W  = P_AXI_DATA_W / 8,
     parameter int P_AXI_ID_W    = 4,
     parameter int P_SRAM_ADDR_W = 16,
@@ -97,6 +97,17 @@ module top
     wire [31:0] reg_debug_ctrl;
     wire [31:0] reg_exec_mode;
 
+    // 64-Bit Upper Base and NVMe Storage Registers
+    wire [31:0] reg_ddr_base_act_hi;
+    wire [31:0] reg_ddr_base_wgt_hi;
+    wire [31:0] reg_ddr_base_kv_hi;
+    wire [31:0] reg_ddr_base_out_hi;
+    wire [31:0] reg_storage_lba_lo;
+    wire [31:0] reg_storage_lba_hi;
+    wire [31:0] reg_storage_blocks;
+    wire [31:0] reg_storage_ctrl;
+    wire [31:0] storage_status = 32'h0000_0001; // Storage engine idle/ready
+
     // Graph mode status (tied to 0 until graph_top is instantiated)
     logic [31:0] graph_status_w;
     logic [31:0] graph_pc_w;
@@ -152,18 +163,18 @@ module top
     logic dma_rd_busy, dma_wr_busy;
 
     // DMA command
-    logic        dma_rd_int_cmd_valid, dma_rd_int_cmd_ready;
-    logic [31:0] dma_rd_int_cmd_addr;
-    logic [23:0] dma_rd_int_cmd_len;
-    logic [3:0]  dma_rd_int_cmd_tag;
-    logic        dma_rd_data_valid, dma_rd_data_ready;
-    logic [P_AXI_DATA_W-1:0] dma_rd_data;
-    logic        dma_rd_data_last;
+    logic                        dma_rd_int_cmd_valid, dma_rd_int_cmd_ready;
+    logic [P_AXI_ADDR_W-1:0]     dma_rd_int_cmd_addr;
+    logic [23:0]                 dma_rd_int_cmd_len;
+    logic [3:0]                  dma_rd_int_cmd_tag;
+    logic                        dma_rd_data_valid, dma_rd_data_ready;
+    logic [P_AXI_DATA_W-1:0]     dma_rd_data;
+    logic                        dma_rd_data_last;
 
-    logic        dma_wr_int_cmd_valid, dma_wr_int_cmd_ready;
-    logic [31:0] dma_wr_int_cmd_addr;
-    logic [23:0] dma_wr_int_cmd_len;
-    logic [3:0]  dma_wr_int_cmd_tag;
+    logic                        dma_wr_int_cmd_valid, dma_wr_int_cmd_ready;
+    logic [P_AXI_ADDR_W-1:0]     dma_wr_int_cmd_addr;
+    logic [23:0]                 dma_wr_int_cmd_len;
+    logic [3:0]                  dma_wr_int_cmd_tag;
 
     // Decoded fields from decoder
     logic [15:0] dec_gemm_src0, dec_gemm_src1, dec_gemm_dst;
@@ -279,6 +290,15 @@ module top
         .token_idx_o      (reg_token_idx),
         .debug_ctrl_o     (reg_debug_ctrl),
         .exec_mode_o      (reg_exec_mode),
+        .ddr_base_act_hi_o(reg_ddr_base_act_hi),
+        .ddr_base_wgt_hi_o(reg_ddr_base_wgt_hi),
+        .ddr_base_kv_hi_o (reg_ddr_base_kv_hi),
+        .ddr_base_out_hi_o(reg_ddr_base_out_hi),
+        .storage_lba_lo_o (reg_storage_lba_lo),
+        .storage_lba_hi_o (reg_storage_lba_hi),
+        .storage_blocks_o (reg_storage_blocks),
+        .storage_ctrl_o   (reg_storage_ctrl),
+        .storage_status_i (storage_status),
         .graph_status_i   (graph_status_w),
         .graph_pc_i       (graph_pc_w),
         .graph_last_op_i  (graph_last_op_w),
@@ -685,15 +705,23 @@ module top
 
     // =========================================================================
     // DMA Command Translation (decode -> DMA engine)
+    // Supports 64-bit physical memory space (up to 1 TB RAM) and 10 TB+ Storage
     // =========================================================================
+    wire [63:0] full_base_act     = {reg_ddr_base_act_hi, reg_ddr_base_act};
+    wire [63:0] full_base_wgt     = {reg_ddr_base_wgt_hi, reg_ddr_base_wgt};
+    wire [63:0] full_base_kv      = {reg_ddr_base_kv_hi,  reg_ddr_base_kv};
+    wire [63:0] full_base_out     = {reg_ddr_base_out_hi, reg_ddr_base_out};
+    wire [63:0] full_base_storage = {reg_storage_lba_hi,  reg_storage_lba_lo};
+
     always_comb begin
         dma_rd_int_cmd_valid = dma_rd_cmd_valid;
         case (dec_dma_rd_flags[2:0])
-            3'd0:    dma_rd_int_cmd_addr = reg_ddr_base_act + {16'b0, dec_dma_rd_src};
-            3'd1:    dma_rd_int_cmd_addr = reg_ddr_base_wgt + {16'b0, dec_dma_rd_src};
-            3'd2:    dma_rd_int_cmd_addr = reg_ddr_base_kv  + {16'b0, dec_dma_rd_src};
-            3'd4:    dma_rd_int_cmd_addr = reg_ucode_base   + {16'b0, dec_dma_rd_src};
-            default: dma_rd_int_cmd_addr = reg_ddr_base_act + {16'b0, dec_dma_rd_src};
+            3'd0:    dma_rd_int_cmd_addr = full_base_act + P_AXI_ADDR_W'(dec_dma_rd_src);
+            3'd1:    dma_rd_int_cmd_addr = full_base_wgt + P_AXI_ADDR_W'(dec_dma_rd_src);
+            3'd2:    dma_rd_int_cmd_addr = full_base_kv  + P_AXI_ADDR_W'(dec_dma_rd_src);
+            3'd4:    dma_rd_int_cmd_addr = P_AXI_ADDR_W'(reg_ucode_base) + P_AXI_ADDR_W'(dec_dma_rd_src);
+            3'd5:    dma_rd_int_cmd_addr = full_base_storage + P_AXI_ADDR_W'(dec_dma_rd_src); // Direct 10TB+ NVMe Stream
+            default: dma_rd_int_cmd_addr = full_base_act + P_AXI_ADDR_W'(dec_dma_rd_src);
         endcase
         dma_rd_int_cmd_len = {8'b0, dec_dma_rd_len};
         dma_rd_int_cmd_tag = dec_dma_rd_flags[6:3];
@@ -702,9 +730,10 @@ module top
     always_comb begin
         dma_wr_int_cmd_valid = dma_wr_cmd_valid;
         case (dec_dma_wr_flags[2:0])
-            3'd0:    dma_wr_int_cmd_addr = reg_ddr_base_act + {16'b0, dec_dma_wr_dst};
-            3'd3:    dma_wr_int_cmd_addr = reg_ddr_base_out + {16'b0, dec_dma_wr_dst};
-            default: dma_wr_int_cmd_addr = reg_ddr_base_out + {16'b0, dec_dma_wr_dst};
+            3'd0:    dma_wr_int_cmd_addr = full_base_act + P_AXI_ADDR_W'(dec_dma_wr_dst);
+            3'd3:    dma_wr_int_cmd_addr = full_base_out + P_AXI_ADDR_W'(dec_dma_wr_dst);
+            3'd5:    dma_wr_int_cmd_addr = full_base_storage + P_AXI_ADDR_W'(dec_dma_wr_dst); // Direct 10TB+ NVMe Write
+            default: dma_wr_int_cmd_addr = full_base_out + P_AXI_ADDR_W'(dec_dma_wr_dst);
         endcase
         dma_wr_int_cmd_len = {8'b0, dec_dma_wr_len};
         dma_wr_int_cmd_tag = dec_dma_wr_flags[6:3];

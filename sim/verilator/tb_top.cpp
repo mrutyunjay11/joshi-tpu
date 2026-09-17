@@ -39,48 +39,48 @@ public:
 
     DDRModel(size_t size = 256 * 1024 * 1024) : mem(size, 0) {}
 
-    void write8(uint32_t addr, uint8_t val) {
+    void write8(uint64_t addr, uint8_t val) {
         if (addr < mem.size()) mem[addr] = val;
     }
 
-    uint8_t read8(uint32_t addr) {
+    uint8_t read8(uint64_t addr) {
         return (addr < mem.size()) ? mem[addr] : 0;
     }
 
-    void write16(uint32_t addr, uint16_t val) {
+    void write16(uint64_t addr, uint16_t val) {
         write8(addr,     val & 0xFF);
         write8(addr + 1, (val >> 8) & 0xFF);
     }
 
-    uint16_t read16(uint32_t addr) {
+    uint16_t read16(uint64_t addr) {
         return (uint16_t)read8(addr) | ((uint16_t)read8(addr + 1) << 8);
     }
 
-    void write32(uint32_t addr, uint32_t val) {
+    void write32(uint64_t addr, uint32_t val) {
         write8(addr,     val & 0xFF);
         write8(addr + 1, (val >> 8) & 0xFF);
         write8(addr + 2, (val >> 16) & 0xFF);
         write8(addr + 3, (val >> 24) & 0xFF);
     }
 
-    uint32_t read32(uint32_t addr) {
+    uint32_t read32(uint64_t addr) {
         return (uint32_t)read8(addr)
              | ((uint32_t)read8(addr + 1) << 8)
              | ((uint32_t)read8(addr + 2) << 16)
              | ((uint32_t)read8(addr + 3) << 24);
     }
 
-    void write_block(uint32_t addr, const uint8_t* data, size_t len) {
+    void write_block(uint64_t addr, const uint8_t* data, size_t len) {
         for (size_t i = 0; i < len && (addr + i) < mem.size(); i++)
             mem[addr + i] = data[i];
     }
 
-    void read_block(uint32_t addr, uint8_t* data, size_t len) {
+    void read_block(uint64_t addr, uint8_t* data, size_t len) {
         for (size_t i = 0; i < len && (addr + i) < mem.size(); i++)
             data[i] = mem[addr + i];
     }
 
-    void load_file(uint32_t addr, const std::string& path) {
+    void load_file(uint64_t addr, const std::string& path) {
         std::ifstream f(path, std::ios::binary);
         if (!f) {
             std::cerr << "[DDR] Cannot open " << path << std::endl;
@@ -132,6 +132,19 @@ constexpr uint32_t REG_HEADS      = 0x24;  // Number of attention heads
 constexpr uint32_t REG_HEAD_DIM   = 0x28;  // Dimension per head
 constexpr uint32_t REG_SEQ_LEN    = 0x2C;  // Sequence length
 constexpr uint32_t REG_TOKEN_IDX  = 0x30;  // Token index (for incremental inference)
+
+// 64-Bit Upper Base Address Registers (for 1 TB+ RAM)
+constexpr uint32_t REG_DDR_ACT_HI     = 0x48;
+constexpr uint32_t REG_DDR_WGT_HI     = 0x4C;
+constexpr uint32_t REG_DDR_KV_HI      = 0x50;
+constexpr uint32_t REG_DDR_OUT_HI     = 0x54;
+
+// 64-Bit Storage Engine Registers (for 10 TB+ NVMe Direct Streaming)
+constexpr uint32_t REG_STORAGE_LBA_LO = 0x58;
+constexpr uint32_t REG_STORAGE_LBA_HI = 0x5C;
+constexpr uint32_t REG_STORAGE_BLOCKS = 0x60;
+constexpr uint32_t REG_STORAGE_CTRL   = 0x64;
+constexpr uint32_t REG_STORAGE_STATUS = 0x68;
 
 // Status register bits
 constexpr uint32_t STATUS_DONE = 0x1;
@@ -204,7 +217,7 @@ class AXI4SlaveModel {
 
     // --- Read channel state ---
     bool     ar_pending = false;
-    uint32_t ar_addr    = 0;
+    uint64_t ar_addr    = 0;
     uint8_t  ar_len     = 0;   // burst length - 1
     uint8_t  ar_size    = 0;   // log2(bytes per beat)
     uint8_t  ar_id      = 0;
@@ -212,7 +225,7 @@ class AXI4SlaveModel {
 
     // --- Write channel state ---
     bool     aw_pending = false;
-    uint32_t aw_addr    = 0;
+    uint64_t aw_addr    = 0;
     uint8_t  aw_len     = 0;
     uint8_t  aw_size    = 0;
     uint8_t  aw_id      = 0;
@@ -244,7 +257,7 @@ public:
         // Drive R (read-data) channel
         if (ar_pending) {
             int bytes_per_beat = 1 << ar_size;  // 2^size
-            uint32_t beat_addr = ar_addr + r_beat * bytes_per_beat;
+            uint64_t beat_addr = ar_addr + (uint64_t)r_beat * bytes_per_beat;
 
             // Read data from DDR model (up to 128-bit / 16 bytes per beat)
             uint64_t lo = 0, hi = 0;
@@ -305,7 +318,7 @@ public:
             dut->m_axi_wready = 1;
             if (dut->m_axi_wvalid) {
                 int bytes_per_beat = 1 << aw_size;
-                uint32_t beat_addr = aw_addr + w_beat * bytes_per_beat;
+                uint64_t beat_addr = aw_addr + (uint64_t)w_beat * bytes_per_beat;
 
                 // Extract 128-bit write data from Verilator WData array
                 uint8_t wdata[16];
@@ -400,12 +413,23 @@ bool test_register_access(Vtop* dut, AXILiteMaster& axil,
     axil.write_reg(REG_HEAD_DIM, 16, tc, tfp);
     axil.write_reg(REG_SEQ_LEN,   8, tc, tfp);
 
+    // Write 64-bit upper address registers (verifying 1 TB RAM + 10 TB storage support)
+    axil.write_reg(REG_DDR_ACT_HI,     0x00000001, tc, tfp); // > 4 GB address offset
+    axil.write_reg(REG_STORAGE_LBA_LO, 0x12345678, tc, tfp);
+    axil.write_reg(REG_STORAGE_LBA_HI, 0x0000000A, tc, tfp); // 10 TB+ LBA range
+    axil.write_reg(REG_STORAGE_BLOCKS, 1024,       tc, tfp);
+
     // Read back and verify
     struct { uint32_t addr; uint32_t expect; const char* name; } checks[] = {
-        { REG_HIDDEN,   64, "HIDDEN"   },
-        { REG_HEADS,     4, "HEADS"    },
-        { REG_HEAD_DIM, 16, "HEAD_DIM" },
-        { REG_SEQ_LEN,   8, "SEQ_LEN"  },
+        { REG_HIDDEN,           64,         "HIDDEN"           },
+        { REG_HEADS,            4,          "HEADS"            },
+        { REG_HEAD_DIM,         16,         "HEAD_DIM"         },
+        { REG_SEQ_LEN,          8,          "SEQ_LEN"          },
+        { REG_DDR_ACT_HI,       0x00000001, "DDR_ACT_HI (1TB)" },
+        { REG_STORAGE_LBA_LO,   0x12345678, "STORAGE_LBA_LO"   },
+        { REG_STORAGE_LBA_HI,   0x0000000A, "STORAGE_LBA_HI"   },
+        { REG_STORAGE_BLOCKS,   1024,       "STORAGE_BLOCKS"   },
+        { REG_STORAGE_STATUS,   0x00000001, "STORAGE_STATUS"   },
     };
 
     bool pass = true;
@@ -416,7 +440,7 @@ bool test_register_access(Vtop* dut, AXILiteMaster& axil,
                       << " (expected " << c.expect << ")" << std::endl;
             pass = false;
         } else {
-            std::cout << "  OK: REG_" << c.name << " = " << val << std::endl;
+            std::cout << "  OK: REG_" << c.name << " = 0x" << std::hex << val << std::dec << std::endl;
         }
     }
 

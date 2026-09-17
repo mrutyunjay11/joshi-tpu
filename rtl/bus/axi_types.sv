@@ -9,9 +9,9 @@ package axi_types_pkg;
     // =======================================================================
     //  AXI4 Full Parameters
     // =======================================================================
-    localparam int AXI_ADDR_W  = 32;
+    localparam int AXI_ADDR_W  = 64;
     localparam int AXI_DATA_W  = 512;
-    localparam int AXI_STRB_W  = AXI_DATA_W / 8;   // 16
+    localparam int AXI_STRB_W  = AXI_DATA_W / 8;
     localparam int AXI_ID_W    = 4;
     localparam int AXI_LEN_W   = 8;
     localparam int AXI_SIZE_W  = 3;

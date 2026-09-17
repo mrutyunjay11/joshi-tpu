@@ -20,7 +20,7 @@ package npu_pkg;
     parameter int ACC_W         = 32;  // INT32 accumulators
     parameter int INTER_W       = 16;  // INT16 intermediates
     parameter int AXI_DATA_W    = 128; // AXI data bus width
-    parameter int AXI_ADDR_W    = 32;
+    parameter int AXI_ADDR_W    = 64;  // 64-bit physical addressing (up to 16 Exabytes, supporting 1 TB RAM)
     parameter int AXI_STRB_W    = AXI_DATA_W / 8;
     parameter int AXI_ID_W      = 4;
     parameter int AXIL_DATA_W   = 32;
@@ -93,6 +93,19 @@ package npu_pkg;
     parameter logic [AXIL_ADDR_W-1:0] REG_GRAPH_STATUS  = 32'h3C;
     parameter logic [AXIL_ADDR_W-1:0] REG_GRAPH_PC      = 32'h40;
     parameter logic [AXIL_ADDR_W-1:0] REG_GRAPH_LAST_OP = 32'h44;
+
+    // 64-Bit Upper Base Address Registers (Supports up to 1 Terabyte of physical RAM)
+    parameter logic [AXIL_ADDR_W-1:0] REG_DDR_BASE_ACT_HI  = 32'h48;
+    parameter logic [AXIL_ADDR_W-1:0] REG_DDR_BASE_WGT_HI  = 32'h4C;
+    parameter logic [AXIL_ADDR_W-1:0] REG_DDR_BASE_KV_HI   = 32'h50;
+    parameter logic [AXIL_ADDR_W-1:0] REG_DDR_BASE_OUT_HI  = 32'h54;
+
+    // 64-Bit Storage Engine Interface (Supports 10 Terabytes+ NVMe SSD direct streaming)
+    parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_LBA_LO   = 32'h58;
+    parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_LBA_HI   = 32'h5C;
+    parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_BLOCKS   = 32'h60;
+    parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_CTRL     = 32'h64;
+    parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_STATUS   = 32'h68;
 
     // Execution mode constants
     parameter int EXEC_MODE_LEGACY = 0;
