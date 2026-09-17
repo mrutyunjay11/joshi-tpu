@@ -180,6 +180,37 @@ module top
     logic dma_rd_error;
     logic dma_wr_error;
 
+    // Mega SRAM signals
+    logic                       wgt_sram_rd_en;
+    logic [P_SRAM_ADDR_W-1:0]   wgt_sram_rd_addr;
+    logic [P_AXI_DATA_W-1:0]    wgt_sram_rd_data;
+    logic                       wgt_sram_rd_valid;
+    logic                       wgt_sram_wr_en;
+    logic [P_SRAM_ADDR_W-1:0]   wgt_sram_wr_addr;
+    logic [P_AXI_DATA_W-1:0]    wgt_sram_wr_data;
+
+    logic                       act_sram_rd_en;
+    logic [P_SRAM_ADDR_W-1:0]   act_sram_rd_addr;
+    logic [P_AXI_DATA_W-1:0]    act_sram_rd_data;
+    logic                       act_sram_rd_valid;
+    logic                       act_sram_wr_en;
+    logic [P_SRAM_ADDR_W-1:0]   act_sram_wr_addr;
+    logic [P_AXI_DATA_W-1:0]    act_sram_wr_data;
+
+    logic                       out_sram_rd_en;
+    logic [P_SRAM_ADDR_W-1:0]   out_sram_rd_addr;
+    logic [P_AXI_DATA_W-1:0]    out_sram_rd_data;
+    logic                       out_sram_rd_valid;
+    logic                       out_sram_wr_en;
+    logic [P_SRAM_ADDR_W-1:0]   out_sram_wr_addr;
+    logic [P_AXI_DATA_W-1:0]    out_sram_wr_data;
+
+    // DMA Write streaming signals
+    logic                       dma_wr_data_valid;
+    logic                       dma_wr_data_ready;
+    logic [P_AXI_DATA_W-1:0]    dma_wr_data_in;
+    logic                       dma_wr_data_last;
+
     // Compose engine_done vector
     assign engine_done_vec[0] = gemm_done;
     assign engine_done_vec[1] = softmax_done;
@@ -356,10 +387,10 @@ module top
         .m_axi_bresp    (dma_axi_bresp),
         .m_axi_bvalid   (dma_axi_bvalid),
         .m_axi_bready   (dma_axi_bready),
-        .data_valid     (1'b0),       // Placeholder: connect when STORE implemented
-        .data_ready     (),
-        .data_in        ({P_AXI_DATA_W{1'b0}}),
-        .data_last      (1'b0),
+        .data_valid     (dma_wr_data_valid),
+        .data_ready     (dma_wr_data_ready),
+        .data_in        (dma_wr_data_in),
+        .data_last      (dma_wr_data_last),
         .busy           (dma_wr_busy),
         .done           (dma_wr_done),
         .error          (dma_wr_error)
@@ -445,27 +476,33 @@ module top
     ) u_mega_sram (
         .clk          (clk),
         .rst_n        (rst_int_n),
-        .wgt_rd_en    (1'b0), // Driven by engines
-        .wgt_rd_addr  ('0),
-        .wgt_rd_data  (),
-        .wgt_rd_valid (),
-        .wgt_wr_en    (1'b0), // Driven by DMA
-        .wgt_wr_addr  ('0),
-        .wgt_wr_data  ('0),
-        .act_rd_en    (1'b0), // Driven by engines
-        .act_rd_addr  ('0),
-        .act_rd_data  (),
-        .act_rd_valid (),
-        .act_wr_en    (1'b0), // Driven by DMA / engines
-        .act_wr_addr  ('0),
-        .act_wr_data  ('0),
-        .out_rd_en    (1'b0), // Driven by DMA
-        .out_rd_addr  ('0),
-        .out_rd_data  (),
-        .out_rd_valid (),
-        .out_wr_en    (1'b0), // Driven by engines
-        .out_wr_addr  ('0),
-        .out_wr_data  ('0)
+
+        // Weight SRAM: written by DMA Read, read by GEMM
+        .wgt_rd_en    (wgt_sram_rd_en),
+        .wgt_rd_addr  (wgt_sram_rd_addr),
+        .wgt_rd_data  (wgt_sram_rd_data),
+        .wgt_rd_valid (wgt_sram_rd_valid),
+        .wgt_wr_en    (wgt_sram_wr_en),
+        .wgt_wr_addr  (wgt_sram_wr_addr),
+        .wgt_wr_data  (wgt_sram_wr_data),
+
+        // Activation SRAM: written by DMA Read / Engines, read by Engines
+        .act_rd_en    (act_sram_rd_en),
+        .act_rd_addr  (act_sram_rd_addr),
+        .act_rd_data  (act_sram_rd_data),
+        .act_rd_valid (act_sram_rd_valid),
+        .act_wr_en    (act_sram_wr_en),
+        .act_wr_addr  (act_sram_wr_addr),
+        .act_wr_data  (act_sram_wr_data),
+
+        // Output SRAM: read by DMA Write (to DDR), written by Engines
+        .out_rd_en    (out_sram_rd_en),
+        .out_rd_addr  (out_sram_rd_addr),
+        .out_rd_data  (out_sram_rd_data),
+        .out_rd_valid (out_sram_rd_valid),
+        .out_wr_en    (out_sram_wr_en),
+        .out_wr_addr  (out_sram_wr_addr),
+        .out_wr_data  (out_sram_wr_data)
     );
 
     // =========================================================================
@@ -673,7 +710,65 @@ module top
         dma_wr_int_cmd_tag = dec_dma_wr_flags[6:3];
     end
 
-    assign dma_rd_data_ready = 1'b1; // Always accept DMA data (placeholder)
+    // DMA Read write address tracking into Mega SRAM
+    logic [P_SRAM_ADDR_W-1:0] dma_rd_wr_addr_r;
+    always_ff @(posedge clk or negedge rst_int_n) begin
+        if (!rst_int_n) begin
+            dma_rd_wr_addr_r <= '0;
+        end else if (dma_rd_cmd_valid) begin
+            dma_rd_wr_addr_r <= dec_dma_rd_dst[P_SRAM_ADDR_W-1:0];
+        end else if (dma_rd_data_valid && dma_rd_data_ready) begin
+            dma_rd_wr_addr_r <= dma_rd_wr_addr_r + 1'b1;
+        end
+    end
+
+    // Route DMA read data into Weight or Activation SRAM banks
+    assign wgt_sram_wr_en   = dma_rd_data_valid && (dec_dma_rd_flags[2:0] == 3'd1);
+    assign wgt_sram_wr_addr = dma_rd_wr_addr_r;
+    assign wgt_sram_wr_data = dma_rd_data;
+
+    assign act_sram_wr_en   = dma_rd_data_valid && (dec_dma_rd_flags[2:0] == 3'd0 || dec_dma_rd_flags[2:0] == 3'd2);
+    assign act_sram_wr_addr = dma_rd_wr_addr_r;
+    assign act_sram_wr_data = dma_rd_data;
+
+    // DMA Write streaming readout from Output SRAM to DDR
+    logic [P_SRAM_ADDR_W-1:0] dma_wr_rd_addr_r;
+    logic [23:0]              dma_wr_beat_cnt;
+    logic                     dma_wr_streaming;
+
+    always_ff @(posedge clk or negedge rst_int_n) begin
+        if (!rst_int_n) begin
+            dma_wr_rd_addr_r <= '0;
+            dma_wr_beat_cnt  <= '0;
+            dma_wr_streaming <= 1'b0;
+        end else if (dma_wr_cmd_valid) begin
+            dma_wr_rd_addr_r <= dec_dma_wr_src[P_SRAM_ADDR_W-1:0];
+            dma_wr_beat_cnt  <= '0;
+            dma_wr_streaming <= 1'b1;
+        end else if (dma_wr_done) begin
+            dma_wr_streaming <= 1'b0;
+        end else if (dma_wr_streaming && dma_wr_data_ready) begin
+            dma_wr_rd_addr_r <= dma_wr_rd_addr_r + 1'b1;
+            dma_wr_beat_cnt  <= dma_wr_beat_cnt + 1'b1;
+        end
+    end
+
+    assign out_sram_rd_en    = dma_wr_streaming && dma_wr_data_ready;
+    assign out_sram_rd_addr  = dma_wr_rd_addr_r;
+    assign dma_wr_data_valid = out_sram_rd_valid;
+    assign dma_wr_data_in    = out_sram_rd_data;
+    assign dma_wr_data_last  = (dma_wr_beat_cnt == dma_wr_int_cmd_len);
+
+    // Compute Engine ports to Mega SRAM
+    assign wgt_sram_rd_en   = 1'b0;
+    assign wgt_sram_rd_addr = '0;
+    assign act_sram_rd_en   = 1'b0;
+    assign act_sram_rd_addr = '0;
+    assign out_sram_wr_en   = 1'b0;
+    assign out_sram_wr_addr = '0;
+    assign out_sram_wr_data = '0;
+
+    assign dma_rd_data_ready = 1'b1; // Accept DMA data into Mega SRAM
 
     // =========================================================================
     // Engine stubs: placeholder done signals for engines not yet fully wired

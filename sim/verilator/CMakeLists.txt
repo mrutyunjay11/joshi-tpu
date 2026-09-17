@@ -55,6 +55,8 @@ set(SV_TOP_EXTRA
     ${RTL_DIR}/ctrl/ucode_decode.sv
     ${RTL_DIR}/gemm/gemm_ctrl.sv
     ${RTL_DIR}/gemm/gemm_post.sv
+    ${RTL_DIR}/mem/l2_cache.sv
+    ${RTL_DIR}/mem/mega_sram.sv
     ${RTL_DIR}/top.sv
 )
 

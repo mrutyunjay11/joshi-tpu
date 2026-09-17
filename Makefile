@@ -15,16 +15,19 @@ LUT_DIR     := rtl/ops
 VERILATOR   ?= verilator
 VERILATOR_FLAGS := --cc --trace --trace-structs -Wall \
     -Wno-UNUSED -Wno-UNDRIVEN -Wno-PINCONNECTEMPTY \
+    -Wno-DECLFILENAME -Wno-IMPORTSTAR \
+    -Wno-VARHIDDEN -Wno-WIDTHTRUNC -Wno-WIDTHEXPAND -Wno-WIDTH \
     --x-assign unique --x-initial unique \
     -DSIMULATION \
     -I$(RTL_DIR)/pkg -I$(RTL_DIR)/bus -I$(RTL_DIR)/mem \
-    -I$(RTL_DIR)/ctrl -I$(RTL_DIR)/gemm -I$(RTL_DIR)/ops
+    -I$(RTL_DIR)/ctrl -I$(RTL_DIR)/gemm -I$(RTL_DIR)/ops -I$(RTL_DIR)/graph
 
 # SystemVerilog sources (order matters for packages)
 SV_PKG := \
     $(RTL_DIR)/pkg/npu_pkg.sv \
     $(RTL_DIR)/pkg/isa_pkg.sv \
     $(RTL_DIR)/pkg/fixed_pkg.sv \
+    $(RTL_DIR)/graph/fp16_utils.sv \
     $(RTL_DIR)/bus/axi_types.sv
 
 SV_SRC := \
@@ -34,12 +37,15 @@ SV_SRC := \
     $(RTL_DIR)/mem/sram_dp.sv \
     $(RTL_DIR)/mem/banked_sram.sv \
     $(RTL_DIR)/mem/kv_cache_bank.sv \
+    $(RTL_DIR)/mem/l2_cache.sv \
+    $(RTL_DIR)/mem/mega_sram.sv \
     $(RTL_DIR)/ctrl/addr_gen.sv \
     $(RTL_DIR)/ctrl/scoreboard.sv \
     $(RTL_DIR)/ctrl/barrier.sv \
     $(RTL_DIR)/ctrl/ucode_fetch.sv \
     $(RTL_DIR)/ctrl/ucode_decode.sv \
     $(RTL_DIR)/gemm/mac_int8.sv \
+    $(RTL_DIR)/gemm/mac_fp16.sv \
     $(RTL_DIR)/gemm/pe.sv \
     $(RTL_DIR)/gemm/systolic_array.sv \
     $(RTL_DIR)/gemm/gemm_ctrl.sv \
@@ -83,7 +89,7 @@ $(BUILD_DIR)/Vtop: $(ALL_SV) $(TB_CPP)
 		--top-module $(TOP_MODULE) \
 		--prefix Vtop \
 		--Mdir $(BUILD_DIR)/obj_dir \
-		--exe $(abspath $(TB_CPP)) \
+		--exe ../../$(TB_CPP) \
 		$(ALL_SV)
 	$(MAKE) -C $(BUILD_DIR)/obj_dir -f Vtop.mk Vtop
 	cp $(BUILD_DIR)/obj_dir/Vtop $(BUILD_DIR)/Vtop
