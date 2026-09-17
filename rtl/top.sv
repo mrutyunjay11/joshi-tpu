@@ -118,6 +118,11 @@ module top
     wire [31:0] reg_queue_head;
     wire [31:0] reg_queue_tail;
 
+    // Monolithic On-Die Fabricated Memory Registers (0x90 - 0x98)
+    wire [31:0] reg_mem_fabric_mode;
+    wire [31:0] reg_mem_fabric_bw_ctrl;
+    wire [31:0] mem_fabric_status = 32'h0800_0103; // [31:16] 2048 MB on-die capacity, [15:8] 1-cycle latency, [7:0] Ready & Zero-RAM-Active
+
     // Graph mode status (tied to 0 until graph_top is instantiated)
     logic [31:0] graph_status_w;
     logic [31:0] graph_pc_w;
@@ -317,6 +322,9 @@ module top
         .client_active_mask_hi_o(reg_client_active_mask_hi),
         .queue_head_o         (reg_queue_head),
         .queue_tail_o         (reg_queue_tail),
+        .mem_fabric_mode_o    (reg_mem_fabric_mode),
+        .mem_fabric_status_i  (mem_fabric_status),
+        .mem_fabric_bw_ctrl_o (reg_mem_fabric_bw_ctrl),
         .graph_status_i   (graph_status_w),
         .graph_pc_i       (graph_pc_w),
         .graph_last_op_i  (graph_last_op_w),

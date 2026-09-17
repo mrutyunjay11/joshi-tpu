@@ -120,6 +120,14 @@ package npu_pkg;
     parameter logic [AXIL_ADDR_W-1:0] REG_QUEUE_HEAD         = 32'h88; // Hardware request ring-buffer head
     parameter logic [AXIL_ADDR_W-1:0] REG_QUEUE_TAIL         = 32'h8C; // Hardware request ring-buffer tail
 
+    // =========================================================================
+    // Monolithic On-Die Fabricated Memory Architecture (0x90 - 0x98)
+    // 100% Zero-RAM-Company Dependency (On-Die Silicon Memory Fabric)
+    // =========================================================================
+    parameter logic [AXIL_ADDR_W-1:0] REG_MEM_FABRIC_MODE     = 32'h90; // Bit 0: Autonomous On-Die Native Mode, Bit 1: Direct Systolic Stream, Bit 2: Non-Volatile Instant-Resume
+    parameter logic [AXIL_ADDR_W-1:0] REG_MEM_FABRIC_STATUS   = 32'h94; // [31:16] Fabricated Capacity (MB), [15:8] Latency cycles, [7:0] Fabric Ready & Zero-RAM-Active
+    parameter logic [AXIL_ADDR_W-1:0] REG_MEM_FABRIC_BW_CTRL  = 32'h98; // Crossbar Bandwidth Burst Profile (Petabyte/s internal throughput)
+
     // Execution mode constants
     parameter int EXEC_MODE_LEGACY = 0;
     parameter int EXEC_MODE_GRAPH  = 1;

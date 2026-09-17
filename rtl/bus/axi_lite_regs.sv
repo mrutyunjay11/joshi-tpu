@@ -98,6 +98,13 @@ module axi_lite_regs
     output logic [31:0]               queue_tail_o,
 
     // -----------------------------------------------------------------------
+    //  Monolithic On-Die Fabricated Memory Interface (0x90 - 0x98)
+    // -----------------------------------------------------------------------
+    output logic [31:0]               mem_fabric_mode_o,
+    input  logic [31:0]               mem_fabric_status_i,
+    output logic [31:0]               mem_fabric_bw_ctrl_o,
+
+    // -----------------------------------------------------------------------
     //  Graph Mode status inputs (read-only)
     // -----------------------------------------------------------------------
     input  logic [31:0]               graph_status_i,
@@ -144,6 +151,8 @@ module axi_lite_regs
     logic [31:0] reg_client_active_mask_hi;
     logic [31:0] reg_queue_head;
     logic [31:0] reg_queue_tail;
+    logic [31:0] reg_mem_fabric_mode;
+    logic [31:0] reg_mem_fabric_bw_ctrl;
 
     // Soft-reset hold counter (holds reset for 4 cycles)
     logic [2:0]  soft_reset_cnt;
@@ -277,6 +286,8 @@ module axi_lite_regs
             reg_client_active_mask_hi<= 32'd0;
             reg_queue_head       <= 32'd0;
             reg_queue_tail       <= 32'd0;
+            reg_mem_fabric_mode  <= 32'h0000_0001; // default to autonomous on-die native mode
+            reg_mem_fabric_bw_ctrl<= 32'h0000_00FF; // default maximum internal crossbar bandwidth
             soft_reset_cnt       <= 3'd0;
         end else begin
             // ----------------------------------------------------------
@@ -338,6 +349,8 @@ module axi_lite_regs
                     REG_CLIENT_ACTIVE_MASK_HI[7:0]:reg_client_active_mask_hi<=strb_write(reg_client_active_mask_hi,wr_data, wr_strb);
                     REG_QUEUE_HEAD[7:0]:          reg_queue_head          <= strb_write(reg_queue_head,          wr_data, wr_strb);
                     REG_QUEUE_TAIL[7:0]:          reg_queue_tail          <= strb_write(reg_queue_tail,          wr_data, wr_strb);
+                    REG_MEM_FABRIC_MODE[7:0]:     reg_mem_fabric_mode     <= strb_write(reg_mem_fabric_mode,     wr_data, wr_strb);
+                    REG_MEM_FABRIC_BW_CTRL[7:0]:  reg_mem_fabric_bw_ctrl  <= strb_write(reg_mem_fabric_bw_ctrl,  wr_data, wr_strb);
                     // REG_GRAPH_STATUS, REG_GRAPH_PC, REG_GRAPH_LAST_OP, REG_STORAGE_STATUS are read-only
                     default: ;  // unmapped -- silently ignore
                 endcase
@@ -414,6 +427,9 @@ module axi_lite_regs
                     REG_CLIENT_ACTIVE_MASK_HI[7:0]:s_axil_rdata <= reg_client_active_mask_hi;
                     REG_QUEUE_HEAD[7:0]:          s_axil_rdata <= reg_queue_head;
                     REG_QUEUE_TAIL[7:0]:          s_axil_rdata <= reg_queue_tail;
+                    REG_MEM_FABRIC_MODE[7:0]:     s_axil_rdata <= reg_mem_fabric_mode;
+                    REG_MEM_FABRIC_STATUS[7:0]:   s_axil_rdata <= mem_fabric_status_i;
+                    REG_MEM_FABRIC_BW_CTRL[7:0]:  s_axil_rdata <= reg_mem_fabric_bw_ctrl;
                     default:                 s_axil_rdata <= 32'hDEAD_BEEF;
                 endcase
             end
@@ -458,6 +474,8 @@ module axi_lite_regs
     assign client_active_mask_hi_o = reg_client_active_mask_hi;
     assign queue_head_o          = reg_queue_head;
     assign queue_tail_o          = reg_queue_tail;
+    assign mem_fabric_mode_o     = reg_mem_fabric_mode;
+    assign mem_fabric_bw_ctrl_o  = reg_mem_fabric_bw_ctrl;
 
     // START is a single-cycle pulse derived from the register bit
     assign start_pulse_o = reg_ctrl[CTRL_START];

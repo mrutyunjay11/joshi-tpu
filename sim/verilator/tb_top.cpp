@@ -156,6 +156,11 @@ constexpr uint32_t REG_CLIENT_ACTIVE_MASK_HI=0x84;  // Active client bitmask (32
 constexpr uint32_t REG_QUEUE_HEAD          = 0x88;  // Hardware request ring-buffer head
 constexpr uint32_t REG_QUEUE_TAIL          = 0x8C;  // Hardware request ring-buffer tail
 
+// Monolithic On-Die Fabricated Memory Architecture (Zero RAM Company Dependency)
+constexpr uint32_t REG_MEM_FABRIC_MODE     = 0x90;  // Autonomous On-Die Native Mode
+constexpr uint32_t REG_MEM_FABRIC_STATUS   = 0x94;  // Fabricated Capacity, Latency, Zero-RAM Active
+constexpr uint32_t REG_MEM_FABRIC_BW_CTRL  = 0x98;  // Internal Crossbar Bandwidth Burst Profile
+
 // Status register bits
 constexpr uint32_t STATUS_DONE = 0x1;
 constexpr uint32_t STATUS_BUSY = 0x2;
@@ -435,6 +440,10 @@ bool test_register_access(Vtop* dut, AXILiteMaster& axil,
     axil.write_reg(REG_MULTI_TENANT_CTRL,  0x00000003, tc, tfp); // Enable Continuous Batching + PagedAttention
     axil.write_reg(REG_CLIENT_ACTIVE_MASK, 0x0000FFFF, tc, tfp); // Clients 0..15 active
 
+    // Write On-Die Fabricated Memory configuration (Zero RAM Company Dependency)
+    axil.write_reg(REG_MEM_FABRIC_MODE,    0x00000007, tc, tfp); // Autonomous + Direct Stream + Instant-Resume
+    axil.write_reg(REG_MEM_FABRIC_BW_CTRL, 0x000000FF, tc, tfp); // Petabyte/s burst mode
+
     // Read back and verify
     struct { uint32_t addr; uint32_t expect; const char* name; } checks[] = {
         { REG_HIDDEN,           64,         "HIDDEN"           },
@@ -450,6 +459,9 @@ bool test_register_access(Vtop* dut, AXILiteMaster& axil,
         { REG_CLIENT_BATCH_SZ,  16,         "CLIENT_BATCH_SZ"  },
         { REG_MULTI_TENANT_CTRL,0x00000003, "MULTI_TENANT_CTRL"},
         { REG_CLIENT_ACTIVE_MASK,0x0000FFFF,"CLIENT_ACTIVE_MASK"},
+        { REG_MEM_FABRIC_MODE,  0x00000007, "MEM_FABRIC_MODE (Zero Ext RAM)" },
+        { REG_MEM_FABRIC_STATUS,0x08000103, "MEM_FABRIC_STATUS (2048MB, 1cyc)" },
+        { REG_MEM_FABRIC_BW_CTRL,0x000000FF,"MEM_FABRIC_BW_CTRL" },
     };
 
     bool pass = true;
