@@ -107,6 +107,19 @@ package npu_pkg;
     parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_CTRL     = 32'h64;
     parameter logic [AXIL_ADDR_W-1:0] REG_STORAGE_STATUS   = 32'h68;
 
+    // =========================================================================
+    // Datacenter-Scale Multi-Client Hardware Engine (0x70 - 0x8C)
+    // Enables running a complete Home Datacenter serving 64 clients concurrently
+    // =========================================================================
+    parameter logic [AXIL_ADDR_W-1:0] REG_CLIENT_ID          = 32'h70; // Active Client Context ID (0..63)
+    parameter logic [AXIL_ADDR_W-1:0] REG_CLIENT_BATCH_SZ    = 32'h74; // Concurrent clients batch size (1..64)
+    parameter logic [AXIL_ADDR_W-1:0] REG_CLIENT_KV_BASE     = 32'h78; // Base address offset for client's Paged KV-cache
+    parameter logic [AXIL_ADDR_W-1:0] REG_MULTI_TENANT_CTRL  = 32'h7C; // Bit 0: Continuous Batching, Bit 1: PagedAttention
+    parameter logic [AXIL_ADDR_W-1:0] REG_CLIENT_ACTIVE_MASK  = 32'h80; // Active client bitmask (clients 0..31)
+    parameter logic [AXIL_ADDR_W-1:0] REG_CLIENT_ACTIVE_MASK_HI=32'h84; // Active client bitmask (clients 32..63)
+    parameter logic [AXIL_ADDR_W-1:0] REG_QUEUE_HEAD         = 32'h88; // Hardware request ring-buffer head
+    parameter logic [AXIL_ADDR_W-1:0] REG_QUEUE_TAIL         = 32'h8C; // Hardware request ring-buffer tail
+
     // Execution mode constants
     parameter int EXEC_MODE_LEGACY = 0;
     parameter int EXEC_MODE_GRAPH  = 1;

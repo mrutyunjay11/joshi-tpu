@@ -146,6 +146,16 @@ constexpr uint32_t REG_STORAGE_BLOCKS = 0x60;
 constexpr uint32_t REG_STORAGE_CTRL   = 0x64;
 constexpr uint32_t REG_STORAGE_STATUS = 0x68;
 
+// Datacenter Multi-Client Hardware Registers (Serving up to 64 concurrent clients)
+constexpr uint32_t REG_CLIENT_ID           = 0x70;  // Active Client Context ID (0..63)
+constexpr uint32_t REG_CLIENT_BATCH_SZ     = 0x74;  // Concurrent clients batch size (1..64)
+constexpr uint32_t REG_CLIENT_KV_BASE      = 0x78;  // Base address offset for client's Paged KV-cache
+constexpr uint32_t REG_MULTI_TENANT_CTRL   = 0x7C;  // Continuous Batching & PagedAttention control
+constexpr uint32_t REG_CLIENT_ACTIVE_MASK  = 0x80;  // Active client bitmask (0..31)
+constexpr uint32_t REG_CLIENT_ACTIVE_MASK_HI=0x84;  // Active client bitmask (32..63)
+constexpr uint32_t REG_QUEUE_HEAD          = 0x88;  // Hardware request ring-buffer head
+constexpr uint32_t REG_QUEUE_TAIL          = 0x8C;  // Hardware request ring-buffer tail
+
 // Status register bits
 constexpr uint32_t STATUS_DONE = 0x1;
 constexpr uint32_t STATUS_BUSY = 0x2;
@@ -419,6 +429,12 @@ bool test_register_access(Vtop* dut, AXILiteMaster& axil,
     axil.write_reg(REG_STORAGE_LBA_HI, 0x0000000A, tc, tfp); // 10 TB+ LBA range
     axil.write_reg(REG_STORAGE_BLOCKS, 1024,       tc, tfp);
 
+    // Write Datacenter Multi-Client Serving configuration
+    axil.write_reg(REG_CLIENT_ID,          5,          tc, tfp); // Serving Client #5
+    axil.write_reg(REG_CLIENT_BATCH_SZ,     16,         tc, tfp); // 16 concurrent clients
+    axil.write_reg(REG_MULTI_TENANT_CTRL,  0x00000003, tc, tfp); // Enable Continuous Batching + PagedAttention
+    axil.write_reg(REG_CLIENT_ACTIVE_MASK, 0x0000FFFF, tc, tfp); // Clients 0..15 active
+
     // Read back and verify
     struct { uint32_t addr; uint32_t expect; const char* name; } checks[] = {
         { REG_HIDDEN,           64,         "HIDDEN"           },
@@ -430,6 +446,10 @@ bool test_register_access(Vtop* dut, AXILiteMaster& axil,
         { REG_STORAGE_LBA_HI,   0x0000000A, "STORAGE_LBA_HI"   },
         { REG_STORAGE_BLOCKS,   1024,       "STORAGE_BLOCKS"   },
         { REG_STORAGE_STATUS,   0x00000001, "STORAGE_STATUS"   },
+        { REG_CLIENT_ID,        5,          "CLIENT_ID (Multi-Tenant)" },
+        { REG_CLIENT_BATCH_SZ,  16,         "CLIENT_BATCH_SZ"  },
+        { REG_MULTI_TENANT_CTRL,0x00000003, "MULTI_TENANT_CTRL"},
+        { REG_CLIENT_ACTIVE_MASK,0x0000FFFF,"CLIENT_ACTIVE_MASK"},
     };
 
     bool pass = true;

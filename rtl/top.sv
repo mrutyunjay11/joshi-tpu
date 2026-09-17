@@ -108,6 +108,16 @@ module top
     wire [31:0] reg_storage_ctrl;
     wire [31:0] storage_status = 32'h0000_0001; // Storage engine idle/ready
 
+    // Datacenter Multi-Client Serving Registers (0x70 - 0x8C)
+    wire [31:0] reg_client_id;
+    wire [31:0] reg_client_batch_sz;
+    wire [31:0] reg_client_kv_base;
+    wire [31:0] reg_multi_tenant_ctrl;
+    wire [31:0] reg_client_active_mask;
+    wire [31:0] reg_client_active_mask_hi;
+    wire [31:0] reg_queue_head;
+    wire [31:0] reg_queue_tail;
+
     // Graph mode status (tied to 0 until graph_top is instantiated)
     logic [31:0] graph_status_w;
     logic [31:0] graph_pc_w;
@@ -299,6 +309,14 @@ module top
         .storage_blocks_o (reg_storage_blocks),
         .storage_ctrl_o   (reg_storage_ctrl),
         .storage_status_i (storage_status),
+        .client_id_o          (reg_client_id),
+        .client_batch_sz_o    (reg_client_batch_sz),
+        .client_kv_base_o     (reg_client_kv_base),
+        .multi_tenant_ctrl_o  (reg_multi_tenant_ctrl),
+        .client_active_mask_o (reg_client_active_mask),
+        .client_active_mask_hi_o(reg_client_active_mask_hi),
+        .queue_head_o         (reg_queue_head),
+        .queue_tail_o         (reg_queue_tail),
         .graph_status_i   (graph_status_w),
         .graph_pc_i       (graph_pc_w),
         .graph_last_op_i  (graph_last_op_w),

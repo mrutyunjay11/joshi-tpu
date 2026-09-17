@@ -86,6 +86,18 @@ module axi_lite_regs
     input  logic [31:0]               storage_status_i,
 
     // -----------------------------------------------------------------------
+    //  Datacenter Multi-Client Serving Interface (0x70 - 0x8C)
+    // -----------------------------------------------------------------------
+    output logic [31:0]               client_id_o,
+    output logic [31:0]               client_batch_sz_o,
+    output logic [31:0]               client_kv_base_o,
+    output logic [31:0]               multi_tenant_ctrl_o,
+    output logic [31:0]               client_active_mask_o,
+    output logic [31:0]               client_active_mask_hi_o,
+    output logic [31:0]               queue_head_o,
+    output logic [31:0]               queue_tail_o,
+
+    // -----------------------------------------------------------------------
     //  Graph Mode status inputs (read-only)
     // -----------------------------------------------------------------------
     input  logic [31:0]               graph_status_i,
@@ -124,6 +136,14 @@ module axi_lite_regs
     logic [31:0] reg_storage_lba_hi;
     logic [31:0] reg_storage_blocks;
     logic [31:0] reg_storage_ctrl;
+    logic [31:0] reg_client_id;
+    logic [31:0] reg_client_batch_sz;
+    logic [31:0] reg_client_kv_base;
+    logic [31:0] reg_multi_tenant_ctrl;
+    logic [31:0] reg_client_active_mask;
+    logic [31:0] reg_client_active_mask_hi;
+    logic [31:0] reg_queue_head;
+    logic [31:0] reg_queue_tail;
 
     // Soft-reset hold counter (holds reset for 4 cycles)
     logic [2:0]  soft_reset_cnt;
@@ -249,6 +269,14 @@ module axi_lite_regs
             reg_storage_lba_hi   <= 32'd0;
             reg_storage_blocks   <= 32'd0;
             reg_storage_ctrl     <= 32'd0;
+            reg_client_id        <= 32'd0;
+            reg_client_batch_sz  <= 32'd1; // default batch 1
+            reg_client_kv_base   <= 32'd0;
+            reg_multi_tenant_ctrl<= 32'd0;
+            reg_client_active_mask<= 32'd0;
+            reg_client_active_mask_hi<= 32'd0;
+            reg_queue_head       <= 32'd0;
+            reg_queue_tail       <= 32'd0;
             soft_reset_cnt       <= 3'd0;
         end else begin
             // ----------------------------------------------------------
@@ -302,6 +330,14 @@ module axi_lite_regs
                     REG_STORAGE_LBA_HI[7:0]:  reg_storage_lba_hi  <= strb_write(reg_storage_lba_hi,  wr_data, wr_strb);
                     REG_STORAGE_BLOCKS[7:0]:  reg_storage_blocks  <= strb_write(reg_storage_blocks,  wr_data, wr_strb);
                     REG_STORAGE_CTRL[7:0]:    reg_storage_ctrl    <= strb_write(reg_storage_ctrl,    wr_data, wr_strb);
+                    REG_CLIENT_ID[7:0]:           reg_client_id           <= strb_write(reg_client_id,           wr_data, wr_strb);
+                    REG_CLIENT_BATCH_SZ[7:0]:     reg_client_batch_sz     <= strb_write(reg_client_batch_sz,     wr_data, wr_strb);
+                    REG_CLIENT_KV_BASE[7:0]:      reg_client_kv_base      <= strb_write(reg_client_kv_base,      wr_data, wr_strb);
+                    REG_MULTI_TENANT_CTRL[7:0]:   reg_multi_tenant_ctrl   <= strb_write(reg_multi_tenant_ctrl,   wr_data, wr_strb);
+                    REG_CLIENT_ACTIVE_MASK[7:0]:   reg_client_active_mask  <= strb_write(reg_client_active_mask,  wr_data, wr_strb);
+                    REG_CLIENT_ACTIVE_MASK_HI[7:0]:reg_client_active_mask_hi<=strb_write(reg_client_active_mask_hi,wr_data, wr_strb);
+                    REG_QUEUE_HEAD[7:0]:          reg_queue_head          <= strb_write(reg_queue_head,          wr_data, wr_strb);
+                    REG_QUEUE_TAIL[7:0]:          reg_queue_tail          <= strb_write(reg_queue_tail,          wr_data, wr_strb);
                     // REG_GRAPH_STATUS, REG_GRAPH_PC, REG_GRAPH_LAST_OP, REG_STORAGE_STATUS are read-only
                     default: ;  // unmapped -- silently ignore
                 endcase
@@ -370,6 +406,14 @@ module axi_lite_regs
                     REG_STORAGE_BLOCKS[7:0]:  s_axil_rdata <= reg_storage_blocks;
                     REG_STORAGE_CTRL[7:0]:    s_axil_rdata <= reg_storage_ctrl;
                     REG_STORAGE_STATUS[7:0]:  s_axil_rdata <= storage_status_i;
+                    REG_CLIENT_ID[7:0]:           s_axil_rdata <= reg_client_id;
+                    REG_CLIENT_BATCH_SZ[7:0]:     s_axil_rdata <= reg_client_batch_sz;
+                    REG_CLIENT_KV_BASE[7:0]:      s_axil_rdata <= reg_client_kv_base;
+                    REG_MULTI_TENANT_CTRL[7:0]:   s_axil_rdata <= reg_multi_tenant_ctrl;
+                    REG_CLIENT_ACTIVE_MASK[7:0]:   s_axil_rdata <= reg_client_active_mask;
+                    REG_CLIENT_ACTIVE_MASK_HI[7:0]:s_axil_rdata <= reg_client_active_mask_hi;
+                    REG_QUEUE_HEAD[7:0]:          s_axil_rdata <= reg_queue_head;
+                    REG_QUEUE_TAIL[7:0]:          s_axil_rdata <= reg_queue_tail;
                     default:                 s_axil_rdata <= 32'hDEAD_BEEF;
                 endcase
             end
@@ -406,6 +450,14 @@ module axi_lite_regs
     assign storage_lba_hi_o  = reg_storage_lba_hi;
     assign storage_blocks_o  = reg_storage_blocks;
     assign storage_ctrl_o    = reg_storage_ctrl;
+    assign client_id_o           = reg_client_id;
+    assign client_batch_sz_o     = reg_client_batch_sz;
+    assign client_kv_base_o      = reg_client_kv_base;
+    assign multi_tenant_ctrl_o   = reg_multi_tenant_ctrl;
+    assign client_active_mask_o  = reg_client_active_mask;
+    assign client_active_mask_hi_o = reg_client_active_mask_hi;
+    assign queue_head_o          = reg_queue_head;
+    assign queue_tail_o          = reg_queue_tail;
 
     // START is a single-cycle pulse derived from the register bit
     assign start_pulse_o = reg_ctrl[CTRL_START];
